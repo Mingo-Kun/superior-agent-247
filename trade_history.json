@@ -1,0 +1,231 @@
+[
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743593726231",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "instType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "long",
+      "ordType": "market",
+      "sz": "0.001",
+      "clOrdId": "bot_1743593726231"
+    },
+    "exception": "module 'bitget.consts' has no attribute 'SERVER_TIMESTAMP_URL'",
+    "timestamp": "2025-04-02T11:35:26.236566Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743594357855",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "instType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "long",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743594357855"
+    },
+    "exception": "'timestamp'",
+    "timestamp": "2025-04-02T11:45:58.090936Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743594534976",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "instType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "long",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743594534976"
+    },
+    "exception": "API Request Error(code=400172): side mismatch",
+    "timestamp": "2025-04-02T11:48:55.494016Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743602555242",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "instType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "buy",
+      "tradeSide": "open",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743602555242"
+    },
+    "exception": "API Request Error(code=400172): The order type cannot be empty",
+    "timestamp": "2025-04-02T14:02:35.913116Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743602829075",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "instType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "buy",
+      "tradeSide": "open",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743602829075"
+    },
+    "exception": "API Request Error(code=400172): productType cannot be empty",
+    "timestamp": "2025-04-02T14:07:09.646586Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743603205884",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "buy",
+      "tradeSide": "open",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743603205884"
+    },
+    "exception": "API Request Error(code=400172): The order type cannot be empty",
+    "timestamp": "2025-04-02T14:13:26.593755Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743603523222",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "tdMode": "cross",
+      "side": "buy",
+      "tradeSide": "open",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743603523222"
+    },
+    "exception": "API Request Error(code=400172): The margin mode cannot be empty",
+    "timestamp": "2025-04-02T14:18:43.789835Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743603639828",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "marginMode": "crossed",
+      "side": "buy",
+      "tradeSide": "open",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743603639828"
+    },
+    "exception": "API Request Error(code=400172): Margin Coin cannot be empty",
+    "timestamp": "2025-04-02T14:20:40.529218Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743606685537",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "marginCoin": "SUSDT",
+      "marginMode": "crossed",
+      "side": "buy",
+      "tradeSide": "open",
+      "ordType": "market",
+      "sz": "0.02",
+      "clOrdId": "bot_1743606685537"
+    },
+    "exception": "API Request Error(code=400172): The order type cannot be empty",
+    "timestamp": "2025-04-02T15:11:26.083110Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743607508806",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "symbol": "BTCUDT",
+      "marginCoin": "USDT",
+      "marginMode": "isolated",
+      "side": "buy",
+      "orderType": "market",
+      "size": "0.02",
+      "clientOid": "bot_1743607508806",
+      "timeInForce": "GTC",
+      "leverage": "20"
+    },
+    "exception": "API Request Error(code=400172): productType cannot be empty",
+    "timestamp": "2025-04-02T15:25:09.399908Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743607654089",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "symbol": "BTCUDT",
+      "marginCoin": "USDT",
+      "marginMode": "isolated",
+      "side": "buy",
+      "orderType": "market",
+      "size": "0.02",
+      "clientOid": "bot_1743607654089",
+      "timeInForce": "GTC",
+      "leverage": "20"
+    },
+    "exception": "API Request Error(code=40034): Parameter BTCUDT does not exist",
+    "timestamp": "2025-04-02T15:27:35.007214Z"
+  },
+  {
+    "event": "place_order_exception",
+    "clOrdId": "bot_1743608321648",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "symbol": "BTCUSDT",
+      "marginCoin": "USDT",
+      "marginMode": "isolated",
+      "side": "buy",
+      "orderType": "market",
+      "size": "0.02",
+      "clientOid": "bot_1743608321648",
+      "timeInForce": "GTC",
+      "leverage": "20"
+    },
+    "exception": "API Request Error(code=40774): The order type for unilateral position must also be the unilateral position type.",
+    "timestamp": "2025-04-02T15:38:42.216005Z"
+  },
+  {
+    "event": "place_order_fail",
+    "clOrdId": "bot_1743608518170",
+    "params": {
+      "instId": "SBTCSUSDT",
+      "productType": "SUSDT-FUTURES",
+      "symbol": "SBTCSUSDT",
+      "marginCoin": "SUSDT",
+      "marginMode": "isolated",
+      "posSide": "long",
+      "tradeSide": "open",
+      "side": "buy",
+      "orderType": "market",
+      "size": "0.02",
+      "clientOid": "bot_1743608518170",
+      "timeInForce": "GTC",
+      "leverage": "20"
+    },
+    "error_code": "00000",
+    "error_msg": "success",
+    "response": {
+      "code": "00000",
+      "msg": "success",
+      "requestTime": 1743608518701,
+      "data": {
+        "clientOid": "bot_1743608518170",
+        "orderId": "1291353212477091858"
+      }
+    },
+    "timestamp": "2025-04-02T15:41:58.808729Z"
+  }
+]
