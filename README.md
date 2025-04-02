@@ -1,4 +1,4 @@
-# Superior Agent 247 - AI-Powered Trading Bot
+# Superior Agent 247 (Bitget-Demo Trading) - AI-Powered Trading Bot
 
 ## Overview
 An advanced trading bot for Bitget exchange that combines:
