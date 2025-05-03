@@ -114,7 +114,9 @@ class BitgetWsClient:
 
     def connect(self):
         try:
-            self.__ws_client.run_forever(ping_timeout=10)
+            # Disable hostname verification for SSL due to mismatch errors.
+            # WARNING: This reduces security. Investigate the root cause if possible.
+            self.__ws_client.run_forever(ping_timeout=10, sslopt={"check_hostname": False})
         except Exception as ex:
             logger.error(f"WebSocket connection error: {ex}")
 

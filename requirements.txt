@@ -4,3 +4,11 @@ httpx
 python-dotenv
 requests # SDK Dependency
 websocket-client # SDK Dependency
+pycryptodome # SDK Dependency (for Crypto module)
+certifi # For SSL certificate validation
+pandas # For data manipulation
+numpy==1.26.4 # Pin numpy version for pandas-ta compatibility
+pandas-ta>=0.3.14b0 # For technical indicators
+tweepy # For Twitter API access
+textblob # For sentiment analysis
+setuptools # Required by pandas-ta (for pkg_resources)
