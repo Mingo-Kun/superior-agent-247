@@ -33,7 +33,7 @@ except ImportError as e:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent))
-    from bitget.bitget_ws_client import BitgetWsClient, SubscribeReq
+    from bitget.bitget_ws_client import BitgetWsClientAsync, SubscribeReq
     from bitget.exceptions import BitgetAPIException
     from bitget.bitget_api import BitgetApi
 
@@ -586,7 +586,7 @@ async def connect_private_websocket(loop):
         client._BitgetWsClient__loop = loop # Ensure loop is set
         client.build() # Starts connection in a thread
 
-        await asyncio.sleep(3) # Allow time for connection/auth attempt
+        await asyncio.sleep(10) # Allow more time for connection/auth attempt
 
         if not client.has_connect():
              logger.error("[PrivateWS] Failed to connect initially.")
@@ -1126,7 +1126,8 @@ async def run_trading_cycle(rest_client):
         # 1.5 Fetch Social Media Sentiment (Twitter)
         # TODO: Make the query configurable or dynamic based on context/ticker
         sentiment_query = f'{TARGET_INSTRUMENT.replace("SUSDT","")} OR ${TARGET_INSTRUMENT.replace("SUSDT","")} -is:retweet lang:en'
-        social_sentiment_score = await sentiment_analyzer.fetch_tweets_and_analyze(sentiment_query, max_results=25) # Use await for async function
+        # Remove await as fetch_tweets_and_analyze is synchronous
+        social_sentiment_score = sentiment_analyzer.fetch_tweets_and_analyze(sentiment_query, max_results=25)
         logger.info(f"Fetched Twitter sentiment score for '{sentiment_query}': {social_sentiment_score:.4f}")
 
         # 2. Get Recent Candles
@@ -1236,8 +1237,8 @@ async def main():
             # Pass only the REST client, cycle fetches candles from global store
             await run_trading_cycle(rest_client)
             # Removed fixed sleep from main loop, cycle now handles dynamic wait
-            # logger.info(f"Cycle finished. Waiting for 1 hour...")
-            # await asyncio.sleep(3600)  # Run every hour
+            logger.info(f"Cycle finished. Waiting for 1 hour...")
+            await asyncio.sleep(3600)  # Run every hour
 
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("Shutdown signal received...")
