@@ -110,6 +110,7 @@ STOP_LOSS_PERCENT = 0.01         # 1% stop loss
 TAKE_PROFIT_PERCENT = 0.02       # 2% take profit
 RISK_PER_TRADE_PERCENT = 0.01    # Risk 1% of equity per trade
 MIN_TRADE_SIZE = 0.001           # Minimum allowed trade size (adjust based on exchange)
+TRADE_HISTORY_FILE = "trade_history.json" # File to store trade history
 
 # Global storage for candle data
 # Using deque for efficient fixed-size storage
