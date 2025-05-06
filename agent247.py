@@ -1194,8 +1194,8 @@ async def main():
             try:
                 # Pass all required clients to the trading cycle
                 await run_trading_cycle(rest_client) # Corrected function call, ws_client_private and ws_client_public are globally accessible or passed differently if needed by run_trading_cycle
-                logger.info("Main loop execution finished. Breaking loop for testing.")
-                break # Re-added for testing
+                logger.info("Main loop execution finished. Continuing to next cycle.")
+                # break # Removed for continuous operation
             except Exception as loop_exception:
                  logger.error(f"Error during trading cycle execution: {loop_exception}", exc_info=True)
                  # Optional: Add a longer sleep here if errors are frequent
