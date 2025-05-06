@@ -7,6 +7,7 @@ import traceback
 from zlib import crc32
 import websockets
 import ssl # Import ssl module
+from websockets.connection import State # Import State enum
 
 from bitget.consts import GET
 from bitget import consts as c
@@ -23,7 +24,7 @@ def default_handle(message):
     logger.info(f"Default Handler Received: {message}")
 
 def default_error_handle(error):
-    logger.error(f"Default Error Handler Received: {error}")
+    logger.error(f"Default Error Handler Received: {error}", exc_info=True)
 
 class BitgetWsClientAsync:
     def __init__(self, url, api_key=None, api_secret_key=None, passphrase=None, listener=None, error_listener=None):
@@ -82,6 +83,7 @@ class BitgetWsClientAsync:
             try:
                 async with websockets.connect(self.__url, ssl=self.ssl_context, ping_interval=10, ping_timeout=10) as ws:
                     self.__connection = ws
+                    logger.info(f"Assigned connection object type: {type(ws)}; dir: {dir(ws)}")
                     self.__reconnect_attempts = 0
                     logger.info(f"WebSocket connected to {self.__url}")
 
@@ -122,7 +124,7 @@ class BitgetWsClientAsync:
         logger.info("WebSocket run loop finished.")
 
     async def _close_connection(self):
-        if self.__connection and not self.__connection.closed:
+        if self.__connection:
             try:
                 await self.__connection.close()
                 logger.info("WebSocket connection closed gracefully.")
@@ -132,7 +134,8 @@ class BitgetWsClientAsync:
 
     async def _login(self):
         """Sends the login request."""
-        if not self.__connection or self.__connection.closed:
+        # Check if connection exists and is in the OPEN state
+        if not self.__connection or self.__connection.state != State.OPEN:
             logger.warning("Cannot login, WebSocket not connected.")
             return
 
@@ -148,14 +151,18 @@ class BitgetWsClientAsync:
 
     async def send_message(self, op, args):
         """Sends a message to the WebSocket server."""
-        if not self.__connection or self.__connection.closed:
+        # Check if connection exists and is in the OPEN state
+        if not self.__connection or self.__connection.state != State.OPEN:
             logger.warning(f"Cannot send message, WebSocket not connected. Op: {op}")
             return
 
         message_dict = BaseWsReq(op, args).__dict__
-        # Convert SubscribeReq objects within args to dicts for JSON serialization
+        # Convert SubscribeReq or WsLoginReq objects within args to dicts for JSON serialization
         if 'args' in message_dict and isinstance(message_dict['args'], list):
-            message_dict['args'] = [arg.__dict__ if isinstance(arg, SubscribeReq) else arg for arg in message_dict['args']]
+            message_dict['args'] = [
+                arg.__dict__ if isinstance(arg, (SubscribeReq, WsLoginReq)) else arg
+                for arg in message_dict['args']
+            ]
 
         message = json.dumps(message_dict)
 
@@ -350,11 +357,22 @@ class BitgetWsClientAsync:
 
     def _dict_to_subscribe_req(self, d):
         """Converts a dictionary (from message arg) to a SubscribeReq object."""
-        # Handle potential variations in key names ('instId' vs 'coin')
-        inst_id = d.get('instId', d.get('coin'))
-        if inst_id is None:
-            raise KeyError("Missing 'instId' or 'coin' in subscription arg")
-        return SubscribeReq(d['instType'], d['channel'], inst_id)
+        instType = d.get('instType')
+        channel = d.get('channel')
+        if not instType or not channel:
+            raise KeyError("Missing 'instType' or 'channel' in subscription arg")
+
+        if channel == 'account':
+            coin = d.get('coin')
+            if coin is None:
+                raise KeyError("Missing 'coin' for account channel subscription arg")
+            # For account channel, instId is not used in the request, pass coin
+            return SubscribeReq(instType, channel, coin=coin)
+        else:
+            instId = d.get('instId')
+            if instId is None:
+                raise KeyError(f"Missing 'instId' for {channel} channel subscription arg")
+            return SubscribeReq(instType, channel, instId=instId)
 
 # --- Data Structures --- (Mostly unchanged, but adapted BooksInfo init)
 
@@ -438,24 +456,58 @@ class BooksInfo:
         return checknum
 
 class SubscribeReq:
-    def __init__(self, instType, channel, instId):
-        # Ensure consistent naming if needed elsewhere
+    def __init__(self, instType, channel, instId=None, coin=None):
         self.instType = instType
         self.channel = channel
+        # Store both, but prioritize 'coin' for account channel
         self.instId = instId
-        # self.coin = instId # Redundant if instId is always used
+        self.coin = coin
+
+        if channel == 'account' and coin is None:
+            raise ValueError("Parameter 'coin' is required for 'account' channel.")
+        if channel != 'account' and instId is None:
+             raise ValueError(f"Parameter 'instId' is required for '{channel}' channel.")
+
+    # Modify __dict__ behavior for JSON serialization
+    def __getattribute__(self, name):
+        if name == '__dict__':
+            d = object.__getattribute__(self, name).copy()
+            if d.get('channel') == 'account':
+                # For account channel, send 'coin', remove 'instId'
+                if 'instId' in d: del d['instId']
+                if d.get('coin') is None: # Should not happen due to __init__ check
+                     d['coin'] = 'default' # Safety default
+            else:
+                # For other channels, send 'instId', remove 'coin'
+                if 'coin' in d: del d['coin']
+                if d.get('instId') is None: # Should not happen
+                    raise AttributeError("instId is missing for non-account channel")
+            return d
+        return object.__getattribute__(self, name)
 
     def __eq__(self, other) -> bool:
-        return (isinstance(other, SubscribeReq) and
-                self.instType == other.instType and
-                self.channel == other.channel and
-                self.instId == other.instId)
+        if not isinstance(other, SubscribeReq):
+            return False
+        if self.channel == 'account':
+            return (self.instType == other.instType and
+                    self.channel == other.channel and
+                    self.coin == other.coin)
+        else:
+            return (self.instType == other.instType and
+                    self.channel == other.channel and
+                    self.instId == other.instId)
 
     def __hash__(self) -> int:
-        return hash((self.instType, self.channel, self.instId))
+        if self.channel == 'account':
+            return hash((self.instType, self.channel, self.coin))
+        else:
+            return hash((self.instType, self.channel, self.instId))
 
     def __repr__(self): # More informative repr
-        return f"SubscribeReq(instType='{self.instType}', channel='{self.channel}', instId='{self.instId}')"
+        if self.channel == 'account':
+             return f"SubscribeReq(instType='{self.instType}', channel='{self.channel}', coin='{self.coin}')"
+        else:
+             return f"SubscribeReq(instType='{self.instType}', channel='{self.channel}', instId='{self.instId}')"
 
 class BaseWsReq:
     def __init__(self, op, args):

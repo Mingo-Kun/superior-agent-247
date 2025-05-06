@@ -1,4 +1,22 @@
 import asyncio
+import os # Re-import for path printing
+import logging # Re-import for early logging
+
+# --- Early Path Logging ---
+# Get logger early for path confirmation
+early_logger = logging.getLogger('init_path_check')
+early_logger.setLevel(logging.INFO)
+stream_handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+stream_handler.setFormatter(formatter)
+early_logger.addHandler(stream_handler)
+
+try:
+    script_path = os.path.abspath(__file__)
+    early_logger.info(f"Executing script: {script_path}")
+except NameError:
+    early_logger.warning("Could not determine script path (__file__ not defined).")
+# --- End Early Path Logging ---
 import json
 import os
 import logging
@@ -10,11 +28,9 @@ import collections # For deque
 import pandas as pd # Added for data manipulation
 import pandas_ta as ta # Added for technical indicators
 from dotenv import load_dotenv
-from sentiment_analyzer import SentimentAnalyzer # Import the new class
-
 # Configure logging before any other imports
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO, # Changed from DEBUG to INFO to prevent logging sensitive data like API keys
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('bot.log'),
@@ -22,6 +38,8 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+from bitget import consts as c # Import consts for API URL
 
 # Import Bitget SDK components
 try:
@@ -46,7 +64,7 @@ if root_logger.hasHandlers():
     root_logger.handlers.clear()
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO, # Changed from DEBUG to INFO to prevent logging sensitive data like API keys
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('bot.log'),
@@ -60,13 +78,9 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY","")
 BITGET_API_KEY = os.getenv("BITGET_API_KEY","")
 BITGET_SECRET_KEY = os.getenv("BITGET_SECRET_KEY","")
 BITGET_PASSPHRASE = os.getenv("BITGET_PASSPHRASE","")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen/qwen2.5-vl-72b-instruct:free")
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen/qwen3-30b-a3b:free")
 
-# Instantiate Sentiment Analyzer
-sentiment_analyzer = SentimentAnalyzer()
-# IMPORTANT: Ensure Twitter API keys (TWITTER_API_KEY, TWITTER_API_SECRET_KEY, 
-# TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET, TWITTER_BEARER_TOKEN) 
-# are set in your .env file for sentiment analysis to work.
+
 
 # News Feeds
 RSS_FEEDS = [
@@ -86,7 +100,7 @@ BITGET_REST_ACCOUNT_ENDPOINT = '/api/v2/mix/account/account' # Endpoint to get m
 TARGET_INSTRUMENT = "SBTCSUSDT"  # Demo BTC/USDT futures
 # Define Product Type for REST API (V2 uses 'productType' for mix endpoints)
 # Common values: 'USDT-FUTURES', 'COIN-FUTURES', 'SUSDT-FUTURES' (for demo)
-PRODUCT_TYPE_V2 = "SUSDT-FUTURES"
+PRODUCT_TYPE_V2 = "SUSDT-FUTURES" # Use 'umcbl' for USDT-margined futures in V2 API
 INST_TYPE_V2 = PRODUCT_TYPE_V2 # Keep for WS compatibility if needed elsewhere
 
 CANDLE_CHANNEL = "candle1H"      # Candle interval (e.g., 1 hour)
@@ -199,34 +213,35 @@ async def handle_private_message(message):
 
             elif channel == 'orders':
                  for order in data_list:
-                    order_id = order.get('orderId')
-                    client_order_id = order.get('clOrdId') # Use client order ID if available for matching
-                    status = order.get('status')
-                    filled_size_str = order.get('accBaseVolume') # Filled size
-                    avg_fill_price_str = order.get('avgPx') # Average fill price
+                    try:
+                        order_id = order.get('orderId')
+                        client_order_id = order.get('clOrdId') # Use client order ID if available for matching
+                        status = order.get('status')
+                        filled_size_str = order.get('accBaseVolume') # Filled size
+                        avg_fill_price_str = order.get('avgPx') # Average fill price
 
-                    logger.info(f"[PrivateWS] Order Update: ID={order_id}, ClientID={client_order_id}, Status={status}, FilledSz={filled_size_str}, AvgPx={avg_fill_price_str}")
+                        logger.info(f"[PrivateWS] Order Update: ID={order_id}, ClientID={client_order_id}, Status={status}, FilledSz={filled_size_str}, AvgPx={avg_fill_price_str}")
 
-                    # Update trade history when filled
-                    if status == 'filled':
-                        try:
-                            avg_fill_price = float(avg_fill_price_str) if avg_fill_price_str else None
-                            filled_size = float(filled_size_str) if filled_size_str else None
-                            update_data = {
-                                'status': 'Filled',
-                                'actual_entry_price': avg_fill_price,
-                                'filled_size': filled_size,
-                                'order_id': order_id # Store the actual exchange order ID
-                            }
-                            # Use client_order_id for lookup as it's generated by us
-                            update_trade_history(client_order_id, update_data)
-                        except ValueError:
-                             logger.error(f"Could not parse fill price ('{avg_fill_price_str}') or size ('{filled_size_str}') to float for order {order_id}.")
-                        except Exception as e:
-                            logger.error(f"Error processing filled order update for {order_id}: {e}", exc_info=True)
-                    elif status in ['cancelled', 'rejected']:
-                         # Optionally update history for failed/cancelled orders
-                         update_trade_history(client_order_id, {'status': status.capitalize()})
+                        # Update trade history when filled
+                        if status == 'filled':
+                        
+                                avg_fill_price = float(avg_fill_price_str) if avg_fill_price_str else None
+                                filled_size = float(filled_size_str) if filled_size_str else None
+                                update_data = {
+                                    'status': 'Filled',
+                                    'actual_entry_price': avg_fill_price,
+                                    'filled_size': filled_size,
+                                    'order_id': order_id # Store the actual exchange order ID
+                                }
+                                # Use client_order_id for lookup as it's generated by us
+                                update_trade_history(client_order_id, update_data)
+                        elif status in ['cancelled', 'rejected']:
+                             # Optionally update history for failed/cancelled orders
+                             update_trade_history(client_order_id, {'status': status.capitalize()})
+                    except ValueError:
+                         logger.error(f"Could not parse fill price ('{avg_fill_price_str}') or size ('{filled_size_str}') to float for order {order_id}.")
+                    except Exception as e:
+                        logger.error(f"Error processing order update for {order_id or client_order_id}: {e}", exc_info=True)
 
         elif event == 'error':
              logger.error(f"[PrivateWS] Error Event: {data}")
@@ -296,7 +311,7 @@ async def handle_public_message(message):
 
 async def handle_ws_error(client_name, err):
     """Generic callback for WebSocket connection/library errors"""
-    logger.error(f"[{client_name}] Connection/Library Error: {err}")
+    logger.error(f"[{client_name}] Connection/Library Error: {err}", exc_info=True)
 
 # --- Technical Indicator Calculation ---
 
@@ -360,37 +375,66 @@ async def fetch_news():
     """Fetch news from RSS feeds"""
     news_items = []
     fallback_feeds = [
-        "https://news.bitcoin.com/feed/",
-        "https://cryptopotato.com/feed/"
+        "https://cointelegraph.com/rss",
+        "https://cointelegraph.com/rss/tag/bitcoin",
+        "https://cointelegraph.com/rss/category/analysis",
+        "https://cointelegraph.com/rss/category/markets"
     ]
     logger.info("Fetching news from RSS feeds...")
+    all_feeds_successful = True
+    successful_feeds_count = 0
     async with httpx.AsyncClient(timeout=20.0) as client:
-        for url in RSS_FEEDS:
+        for url in RSS_FEEDS[:4]:
+            feed_successful_this_attempt = False
             for attempt in range(3):  # Retry up to 3 times
                 try:
                     response = await client.get(url)
                     response.raise_for_status()
                     feed = feedparser.parse(response.text)
-                    news_items.extend({
-                        "title": entry.title,
-                        "link": entry.link,
-                        "published": entry.get("published", "")
-                    } for entry in feed.entries[:5])
+                    parsed_items = [{ "title": entry.title, "link": entry.link, "published": entry.get("published", "") } for entry in feed.entries[:5]]
+                    news_items.extend(parsed_items)
+                    if parsed_items: # Consider successful if items were parsed
+                        logger.info(f"Successfully fetched {len(parsed_items)} items from {url}")
+                        feed_successful_this_attempt = True
+                    else:
+                        logger.warning(f"Fetched 0 items from {url} (attempt {attempt + 1})")
                     await asyncio.sleep(0.2 * (attempt + 1))  # Exponential backoff
-                    break  # Success, exit retry loop
+                    break  # Success for this feed, exit retry loop
                 except httpx.HTTPStatusError as e:
                     logger.error(f"HTTP error fetching {url} (attempt {attempt + 1}): Status {e.response.status_code}")
-                    if attempt == 2:  # Last attempt failed, try fallback
-                        RSS_FEEDS.extend(fallback_feeds)
+                    if attempt == 2:  # Last attempt failed
+                        all_feeds_successful = False
+                        logger.warning(f"Failed to fetch {url} after 3 attempts due to HTTP error.")
+                        # Try fallback only if it's a critical error type, or always if preferred
+                        # RSS_FEEDS.extend(fallback_feeds) # Decided against auto-extending fallback here to avoid loop complexity
                 except httpx.RequestError as e:
                     logger.error(f"Request error fetching {url} (attempt {attempt + 1}): {e}")
+                    if attempt == 2:
+                        all_feeds_successful = False
+                        logger.warning(f"Failed to fetch {url} after 3 attempts due to request error.")
                 except Exception as e:
                     logger.error(f"Error parsing feed {url} (attempt {attempt + 1}): {e}")
-    logger.info(f"Fetched {len(news_items)} news items.")
+                    if attempt == 2:
+                        all_feeds_successful = False
+                        logger.warning(f"Failed to parse {url} after 3 attempts.")
+            if feed_successful_this_attempt:
+                successful_feeds_count += 1
+            else:
+                all_feeds_successful = False # Mark as not all successful if any feed failed all attempts
+
+    if all_feeds_successful and successful_feeds_count == len(RSS_FEEDS[:4]):
+        logger.info(f"All {successful_feeds_count} RSS feeds fetched successfully. Total items: {len(news_items)}.")
+    elif successful_feeds_count > 0:
+        logger.warning(f"Successfully fetched {successful_feeds_count}/{len(RSS_FEEDS[:4])} RSS feeds. Total items: {len(news_items)}. Some feeds may have failed.")
+    else:
+        logger.error(f"Failed to fetch any news items from RSS feeds. Total items: {len(news_items)}.")
     return news_items
 
-async def get_llm_analysis(news_data, historical_candles, indicator_data, social_sentiment_score):
-    """Get trade signal from LLM analysis, incorporating calculated indicators."""
+async def get_llm_analysis(news_data, historical_candles, indicator_data, learning_insights=None):
+    """Get trade signal from LLM analysis, incorporating calculated indicators and learning insights."""
+    # Ensure learning_insights is a dictionary, even if empty, for consistent prompt formatting
+    if learning_insights is None:
+        learning_insights = {}
     if not OPENROUTER_API_KEY:
         logger.error("OpenRouter API key not configured")
         return None
@@ -420,11 +464,9 @@ async def get_llm_analysis(news_data, historical_candles, indicator_data, social
     Calculated Technical Indicators (Latest values):
     {formatted_indicators}
 
-    Twitter Sentiment Score (Recent Tweets for {TARGET_INSTRUMENT}):
-    {social_sentiment_score:.4f} (-1 Negative, 0 Neutral, 1 Positive)
-
     Learning Insights from Past Trades:
     {formatted_learning}
+    Please consider these insights when forming your justification and signal.
 
     Insticator Key:
     - SMA_20: 20-period Simple Moving Average
@@ -438,9 +480,8 @@ async def get_llm_analysis(news_data, historical_candles, indicator_data, social
 
     Instructions:
     0.  **Learning Insights:** Consider the provided performance patterns based on past trades. How might this influence the current decision?
-    1.  **Twitter Sentiment:** Consider the provided Twitter sentiment score (-1 Negative to 1 Positive). How does it align with or contradict other signals?
-    2.  **Sentiment Analysis:** Briefly assess the overall sentiment conveyed by the news headlines (Positive, Negative, Neutral).
-    3.  **Technical Analysis:**
+    1.  **Sentiment Analysis:** Briefly assess the overall sentiment conveyed by the news headlines (Positive, Negative, Neutral).
+    2.  **Technical Analysis:**
         *   Interpret **SMA_20**: Is the price above/below the SMA, suggesting trend direction?
         *   Interpret **RSI_14**: Is it overbought (>70), oversold (<30), or neutral? Any divergences?
         *   Interpret **MACD**: Is the MACD line above/below the signal line (MACDs)? Is the histogram (MACDh) positive/negative and growing/shrinking, indicating momentum?
@@ -471,62 +512,64 @@ async def get_llm_analysis(news_data, historical_candles, indicator_data, social
     }
 
     logger.info("Requesting LLM analysis with expanded indicators...")
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": LLM_MODEL,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+        )
+        response.raise_for_status()
+        result = response.json()
+
+        if not result.get('choices'):
+            logger.error("LLM response missing 'choices'.")
+            return None
+
+        content = result['choices'][0]['message']['content']
+        logger.debug(f"Raw LLM Response Content: {content}")
+
+    # Process the response content outside the async with block
+    content_cleaned = content.strip()
+    if content_cleaned.startswith("```json"):
+        content_cleaned = content_cleaned[7:]
+    if content_cleaned.endswith("```"):
+        content_cleaned = content_cleaned[:-3]
+    content_cleaned = content_cleaned.strip()
+
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers,
-                json={
-                    "model": LLM_MODEL,
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-            )
-            response.raise_for_status()
-            result = response.json()
+        analysis_json = json.loads(content_cleaned)
+        # Validate the new structure
+        required_keys = ["sentiment", "technical_summary", "signal", "justification", "confidence", "volatility"]
+        if not all(key in analysis_json for key in required_keys):
+            logger.error(f"LLM JSON missing required keys. Expected: {required_keys}. Parsed: {analysis_json}")
+            return None
+        logger.info("LLM analysis received successfully.")
+        return analysis_json
 
-            if not result.get('choices'):
-                 logger.error("LLM response missing 'choices'.")
-                 return None
-
-            content = result['choices'][0]['message']['content']
-            logger.debug(f"Raw LLM Response Content: {content}")
-
-            try:
-                content_cleaned = content.strip()
-                if content_cleaned.startswith("```json"):
-                    content_cleaned = content_cleaned[7:]
-                if content_cleaned.endswith("```"):
-                    content_cleaned = content_cleaned[:-3]
-                content_cleaned = content_cleaned.strip()
-
-                analysis_json = json.loads(content_cleaned)
-                # Validate the new structure
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse LLM JSON response: {e}\nContent: {content}")
+        # Attempt fallback extraction
+        try:
+            json_start = content.find('{')
+            json_end = content.rfind('}') + 1
+            if json_start != -1 and json_end != 0:
+                extracted_json_str = content[json_start:json_end]
+                analysis_json = json.loads(extracted_json_str)
                 required_keys = ["sentiment", "technical_summary", "signal", "justification", "confidence", "volatility"]
-                if not all(key in analysis_json for key in required_keys):
-                     logger.error(f"LLM JSON missing required keys. Expected: {required_keys}. Parsed: {analysis_json}")
-                     return None
-                logger.info("LLM analysis received successfully.")
-                return analysis_json
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse LLM JSON response: {e}\nContent: {content}")
-                # Attempt fallback extraction (optional, can be removed if too unreliable)
-                try:
-                    json_start = content.find('{')
-                    json_end = content.rfind('}') + 1
-                    if json_start != -1 and json_end != 0:
-                        extracted_json_str = content[json_start:json_end]
-                        analysis_json = json.loads(extracted_json_str)
-                        required_keys = ["sentiment", "technical_summary", "signal", "justification", "confidence", "volatility"]
-                        if all(key in analysis_json for key in required_keys):
-                            logger.warning("Successfully parsed LLM JSON using fallback extraction.")
-                            return analysis_json
-                except Exception:
-                    pass # Fallback failed
-                return None # Parsing failed
-            except Exception as e:
-                 logger.error(f"Unexpected error processing LLM response: {e}\nContent: {content}")
-                 return None
+                if all(key in analysis_json for key in required_keys):
+                    logger.warning("Successfully parsed LLM JSON using fallback extraction.")
+                    return analysis_json
+        except Exception as fallback_e:
+            logger.error(f"Fallback JSON extraction failed: {fallback_e}")
+            pass # Fallback failed
+        return None # Parsing and fallback failed
+    except Exception as e:
+         logger.error(f"Unexpected error processing LLM response: {e}\nContent: {content}")
+         return None
 
     except httpx.RequestError as e:
         logger.error(f"LLM API request error: {e}")
@@ -538,32 +581,48 @@ async def get_llm_analysis(news_data, historical_candles, indicator_data, social
 async def get_account_equity(rest_client):
     """Fetch account equity using the REST API."""
     logger.info("Fetching account equity via REST...")
+
+    # Use constants defined earlier for product type
+    # Removing marginCoin, letting API infer from productType
+    params = {
+        "productType": PRODUCT_TYPE_V2, # Should be SUSDT-FUTURES for demo
+        "marginCoin": "SUSDT", # Re-adding marginCoin as it seems required for this endpoint
+        "symbol": TARGET_INSTRUMENT # Added missing symbol parameter
+    }
+    logger.debug(f"Calling Bitget API: {BITGET_REST_ACCOUNT_ENDPOINT} with params: {params}")
     try:
-        params = {
-            "productType": PRODUCT_TYPE_V2,
-            "marginCoin": "SUSDT" # Specify the margin coin
-        }
         result = await asyncio.to_thread(
             rest_client.get, BITGET_REST_ACCOUNT_ENDPOINT, params
         )
-        logger.debug(f"Account Equity Response: {result}")
+        logger.debug(f"Raw Account Equity Response: {result}") # Log raw response
 
-        if isinstance(result, dict) and result.get('code') == '0':
+        # Correctly check for '00000' success code
+        if isinstance(result, dict) and result.get('code') == '00000':
+            logger.debug("API call successful (code 00000).")
             account_data = result.get('data')
             if account_data and 'usdtEquity' in account_data:
-                equity = float(account_data['usdtEquity'])
-                logger.info(f"Successfully fetched account equity: {equity}")
-                return equity
+                try:
+                    equity = float(account_data['usdtEquity'])
+                    logger.info(f"Successfully fetched and parsed account equity: {equity}")
+                    return equity
+                except (ValueError, TypeError) as parse_err:
+                    logger.error(f"Error parsing usdtEquity '{account_data.get('usdtEquity')}': {parse_err}")
+                    return None
             else:
-                logger.error(f"'usdtEquity' not found in account data: {account_data}")
+                logger.error(f"'usdtEquity' key not found or data missing in response data: {account_data}")
                 return None
         else:
+            # Handle non-dict or error code responses
+            error_code = result.get('code', 'N/A') if isinstance(result, dict) else 'N/A'
             error_msg = result.get('msg', 'Unknown error') if isinstance(result, dict) else str(result)
-            logger.error(f"Failed to fetch account equity: {error_msg}")
+            logger.error(f"API call failed. Code: {error_code}, Msg: {error_msg}. Raw response: {result}")
             return None
 
     except Exception as e:
-        logger.error(f"Error fetching account equity: {e}", exc_info=True)
+        # Log the exception more simply first to avoid potential formatting errors
+        logger.error(f"Exception caught in get_account_equity: {e}") 
+        # Then log the full traceback separately
+        logger.exception("Full traceback for equity fetch error:")
         return None
 
 async def connect_private_websocket(loop):
@@ -571,35 +630,40 @@ async def connect_private_websocket(loop):
     if not all([BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE]):
         logger.error("[PrivateWS] Connection requires API credentials.")
         return None
+
     try:
         # --- Wrapper for thread-safe async callback ---
         def private_message_handler_wrapper(message):
             asyncio.run_coroutine_threadsafe(handle_private_message(message), loop)
 
-        client = BitgetWsClient(BITGET_WSS_PRIVATE_URL, need_login=True) \
-            .api_key(BITGET_API_KEY) \
-            .api_secret_key(BITGET_SECRET_KEY) \
-            .passphrase(BITGET_PASSPHRASE) \
-            .error_listener(lambda err: asyncio.run_coroutine_threadsafe(handle_ws_error("PrivateWS", err), loop)) \
-            .listener(private_message_handler_wrapper) # Use the sync wrapper
+        # Initialize client with all necessary parameters
+        client = BitgetWsClientAsync(BITGET_WSS_PRIVATE_URL, 
+                                   api_key=BITGET_API_KEY, 
+                                   api_secret_key=BITGET_SECRET_KEY, 
+                                   passphrase=BITGET_PASSPHRASE, 
+                                   listener=private_message_handler_wrapper, # Use the sync wrapper
+                                   error_listener=lambda err: asyncio.run_coroutine_threadsafe(handle_ws_error("PrivateWS", err), loop))
 
-        client._BitgetWsClient__loop = loop # Ensure loop is set
-        client.build() # Starts connection in a thread
+        # client._BitgetWsClient__loop = loop # Loop is handled internally by websockets/asyncio
+        asyncio.create_task(client.start()) # Start the connection and message handling loop
 
         await asyncio.sleep(10) # Allow more time for connection/auth attempt
 
-        if not client.has_connect():
-             logger.error("[PrivateWS] Failed to connect initially.")
-             return None
+        # Removed client.has_connect() check as it's not available
+        # Connection status is handled internally by the start() loop and error listener.
 
         # Subscribe to account and position updates
-        channels = [
-            SubscribeReq(INST_TYPE_V2, "account", "default"),
-            SubscribeReq(INST_TYPE_V2, "positions", "default")
-            # SubscribeReq(INST_TYPE_V2, "orders", "default") # Optional
-        ]
-        # Assuming subscribe uses the listener set above.
-        client.subscribe(channels) # Rely on the default listener set earlier
+        # Reverting account channel subscription to SubscribeReq format
+        # The format {"instType": ..., "channel": "account", "coin": "default"} caused warnings.
+        # Subscribe using SubscribeReq for all channels
+        # SubscribeReq is modified to handle 'coin' for 'account' channel correctly
+        account_sub = SubscribeReq(INST_TYPE_V2, 'account', coin='default')
+        # Use 'default' for positions channel instId, similar to account channel, keep TARGET_INSTRUMENT for orders for now
+        position_sub = SubscribeReq(INST_TYPE_V2, 'positions', instId='default')
+        order_sub = SubscribeReq(INST_TYPE_V2, 'orders', instId=TARGET_INSTRUMENT)
+
+        channels_to_subscribe = [account_sub, position_sub, order_sub]
+        await client.subscribe(channels_to_subscribe)
 
         logger.info("[PrivateWS] Connection initiated and subscriptions sent.")
         return client
@@ -616,25 +680,25 @@ async def connect_public_websocket(loop):
             asyncio.run_coroutine_threadsafe(handle_public_message(message), loop)
 
         # No login needed for public endpoint
-        client = BitgetWsClient(BITGET_WSS_PUBLIC_URL, need_login=False) \
-            .error_listener(lambda err: asyncio.run_coroutine_threadsafe(handle_ws_error("PublicWS", err), loop)) \
-            .listener(public_message_handler_wrapper) # Use the sync wrapper
+        # Initialize client with all necessary parameters
+        client = BitgetWsClientAsync(BITGET_WSS_PUBLIC_URL, 
+                                   listener=public_message_handler_wrapper, # Use the sync wrapper
+                                   error_listener=lambda err: asyncio.run_coroutine_threadsafe(handle_ws_error("PublicWS", err), loop))
 
-        client._BitgetWsClient__loop = loop
-        client.build()
+        # client._BitgetWsClient__loop = loop # Loop is handled internally by websockets/asyncio
+        asyncio.create_task(client.start()) # Start the connection and message handling loop
 
         await asyncio.sleep(2) # Allow time for connection
 
-        if not client.has_connect():
-             logger.error("[PublicWS] Failed to connect initially.")
-             return None
+        # Removed client.has_connect() check as it's not available
+        # Connection status is handled internally by the start() loop and error listener.
 
         # Subscribe to candle channel
         channels = [
             SubscribeReq(INST_TYPE_V2, CANDLE_CHANNEL, TARGET_INSTRUMENT)
         ]
         # Assuming subscribe uses the listener set earlier.
-        client.subscribe(channels) # Rely on the default listener set earlier
+        await client.subscribe(channels) # Rely on the default listener set earlier
 
         logger.info(f"[PublicWS] Connection initiated and subscribed to {CANDLE_CHANNEL} for {TARGET_INSTRUMENT}.")
         return client
@@ -731,153 +795,23 @@ async def place_trade_via_rest(rest_client, instrument, signal, size, stop_loss_
 
 TRADE_LOG_FILE = "trade_history.json"
 
-def log_trade_event(event_data):
-    """Log trade events to JSON file"""
-    event_data['timestamp'] = datetime.datetime.utcnow().isoformat() + "Z"
-    try:
-        try:
-            with open(TRADE_LOG_FILE, 'r') as f:
-                history = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            history = []
-        history.append(event_data)
-        with open(TRADE_LOG_FILE, 'w') as f:
-            json.dump(history, f, indent=2)
-    except Exception as e:
-        logger.error(f"Failed to log trade event: {e}")
-
-# --- Main Trading Logic ---
-
-async def run_trading_cycle(rest_client, private_ws_client, public_ws_client):
-    """Main trading logic loop"""
-    logger.info("Starting trading cycle...")
-
-    # Ensure we have enough candle data before starting
-    while len(candle_data_store) < 10: # Wait for at least 10 candles
-        logger.info(f"Waiting for sufficient candle data ({len(candle_data_store)}/{MAX_CANDLES})...")
-        await asyncio.sleep(10)
-
-    # Fetch initial equity
-    current_equity = await get_account_equity(rest_client)
-    if current_equity is None:
-        logger.error("Failed to get initial account equity. Cannot proceed with dynamic sizing.")
-        # Decide how to handle this: exit, use a default, or retry?
-        # For now, let's prevent trading without equity info.
-        return
-
-    while True:
-        try:
-            logger.info("--- New Trading Cycle Iteration ---")
-            # 1. Fetch News
-            news = await fetch_news()
-
-            # 2. Get Candle Data (already available via WS)
-            current_candles = list(candle_data_store) # Get a copy
-            if not current_candles:
-                logger.warning("No candle data available yet. Skipping cycle.")
-                await asyncio.sleep(60) # Wait before retrying
-                continue
-
-            # 3. Get LLM Analysis
-            analysis = await get_llm_analysis(news, current_candles)
-
-            if analysis:
-                logger.info(f"LLM Analysis Result: Signal={analysis.get('signal')}, Confidence={analysis.get('confidence')}, Sentiment={analysis.get('sentiment')}, Summary={analysis.get('technical_summary')}")
-
-                # 4. Decision Making (Example: Trade on High/Medium confidence)
-                signal = analysis.get('signal')
-                confidence = analysis.get('confidence')
-
-                # Use 'Hold' signal to explicitly avoid trading
-                if signal and signal.lower() != 'hold' and confidence in ['High', 'Medium']:
-                    logger.info(f"Decision: Proceeding with {signal} signal (Confidence: {confidence})")
-
-                    # --- Dynamic Trade Size Calculation ---
-                    # Fetch latest equity before placing trade
-                    current_equity = await get_account_equity(rest_client)
-                    if current_equity is None:
-                        logger.error("Failed to get current account equity before trade. Skipping trade.")
-                        await asyncio.sleep(60)
-                        continue
-
-                    risk_amount_per_trade = current_equity * RISK_PER_TRADE_PERCENT
-                    last_close_price = current_candles[-1]['c']
-
-                    # Calculate SL/TP prices
-                    if signal.lower() == "long":
-                        stop_loss_price = last_close_price * (1 - STOP_LOSS_PERCENT)
-                        take_profit_price = last_close_price * (1 + TAKE_PROFIT_PERCENT)
-                    elif signal.lower() == "short":
-                        stop_loss_price = last_close_price * (1 + STOP_LOSS_PERCENT)
-                        take_profit_price = last_close_price * (1 - TAKE_PROFIT_PERCENT)
-                    else:
-                        logger.error(f"Invalid signal '{signal}' received from LLM. Skipping trade.")
-                        await asyncio.sleep(60)
-                        continue
-
-                    stop_loss_distance = abs(last_close_price - stop_loss_price)
-
-                    if stop_loss_distance <= 0:
-                        logger.error(f"Stop loss distance is zero or negative ({stop_loss_distance}). Cannot calculate trade size. Skipping trade.")
-                        await asyncio.sleep(60)
-                        continue
-
-                    trade_size = risk_amount_per_trade / stop_loss_distance
-
-                    # Ensure minimum trade size and round
-                    trade_size = max(trade_size, MIN_TRADE_SIZE)
-                    # Adjust rounding precision as needed by the exchange (e.g., 3 decimal places for BTC)
-                    trade_size = round(trade_size, 3)
-
-                    logger.info(f"Calculated Trade Size: {trade_size} (Equity: {current_equity}, Risk Amount: {risk_amount_per_trade}, SL Distance: {stop_loss_distance})")
-                    # --- End Dynamic Trade Size Calculation ---
-
-                    # 5. Place Trade via REST
-                    success = await place_trade_via_rest(
-                        rest_client,
-                        TARGET_INSTRUMENT,
-                        signal,
-                        trade_size,
-                        stop_loss_price=stop_loss_price,
-                        take_profit_price=take_profit_price
-                    )
-                    if success:
-                        logger.info(f"Trade placed successfully: {signal} {trade_size} {TARGET_INSTRUMENT}")
-                    else:
-                        logger.error("Failed to place trade.")
-                else:
-                    logger.info(f"Decision: No trade action. Signal: {signal}, Confidence: {confidence}")
-
-            else:
-                logger.warning("LLM analysis failed or returned no result. Skipping trade decision.")
-
-            # Wait before next cycle (e.g., 1 hour based on candle interval)
-            logger.info("Waiting for next trading cycle (approx 1 hour)...")
-            await asyncio.sleep(3600) # Adjust based on candle interval
-
-        except Exception as e:
-            logger.error(f"Error in trading cycle: {e}", exc_info=True)
-            await asyncio.sleep(60) # Wait before retrying after an error
-
-
-# --- Trade History Logging ---
-
-TRADE_HISTORY_FILE = 'trade_history.json'
-
-def save_trade_history(client_order_id, side, size, entry_price, stop_loss_price, take_profit_price, status, llm_analysis=None, sentiment_score=None, indicators=None):
+def save_trade_history(client_order_id, side, size, entry_price, stop_loss_price, take_profit_price, status, llm_analysis=None, indicators=None):
     """Saves trade details and context to a JSON file."""
-    try:
+    try: # Add try block here
         history = []
         if os.path.exists(TRADE_HISTORY_FILE):
-            with open(TRADE_HISTORY_FILE, 'r') as f:
-                try:
+            try:
+                with open(TRADE_HISTORY_FILE, 'r') as f:
                     history = json.load(f)
                     if not isinstance(history, list):
                         logger.warning(f"'{TRADE_HISTORY_FILE}' does not contain a valid JSON list. Initializing new list.")
                         history = []
-                except json.JSONDecodeError:
-                    logger.warning(f"Could not decode JSON from '{TRADE_HISTORY_FILE}'. Initializing new list.")
-                    history = []
+            except json.JSONDecodeError:
+                logger.warning(f"Could not decode JSON from '{TRADE_HISTORY_FILE}'. Initializing new list.")
+                history = [] # Ensure history is a list even if file is corrupt
+            except Exception as e:
+                logger.error(f"Error reading trade history file '{TRADE_HISTORY_FILE}': {e}", exc_info=True)
+                history = [] # Ensure history is a list on other read errors
 
         trade_record = {
             'timestamp': datetime.datetime.now().isoformat(),
@@ -890,7 +824,6 @@ def save_trade_history(client_order_id, side, size, entry_price, stop_loss_price
             'take_profit_price': take_profit_price,
             'status': status, # e.g., 'Placed', 'PlaceFailed_NoID', 'PlaceFailed_APIExc_...', 'Filled', 'Closed_SL', 'Closed_TP'
             'llm_analysis': llm_analysis, # Full analysis dict
-            'twitter_sentiment_score': sentiment_score,
             'indicators_at_trade': indicators, # Full indicators dict
             'actual_entry_price': None, # To be updated on fill
             'exit_price': None, # To be updated on close
@@ -899,11 +832,17 @@ def save_trade_history(client_order_id, side, size, entry_price, stop_loss_price
 
         history.append(trade_record)
 
+        # Ensure the directory exists before writing
+        # Get the directory path from the full file path
+        history_dir = os.path.dirname(TRADE_HISTORY_FILE)
+        if history_dir: # Check if dirname returned a non-empty string
+            os.makedirs(history_dir, exist_ok=True)
+
         with open(TRADE_HISTORY_FILE, 'w') as f:
             json.dump(history, f, indent=4)
         logger.info(f"Saved trade record for {client_order_id} with status '{status}'")
 
-    except Exception as e:
+    except Exception as e: # This except block now correctly corresponds to the outer try
         logger.error(f"Error saving trade history for {client_order_id}: {e}", exc_info=True)
 
 
@@ -915,12 +854,18 @@ def update_trade_history(order_id, update_data):
             logger.warning(f"Trade history file {TRADE_HISTORY_FILE} not found for update.")
             return
 
-        with open(TRADE_HISTORY_FILE, 'r') as f:
-            try:
+        try:
+            with open(TRADE_HISTORY_FILE, 'r') as f:
                 history = json.load(f)
-            except json.JSONDecodeError:
-                logger.error(f"Error decoding JSON from {TRADE_HISTORY_FILE}. Cannot update.")
-                history = [] # Start fresh if file is corrupt
+                if not isinstance(history, list):
+                    logger.warning(f"'{TRADE_HISTORY_FILE}' does not contain a valid JSON list. Resetting.")
+                    history = []
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from {TRADE_HISTORY_FILE}. Cannot update. Resetting.")
+            history = [] # Start fresh if file is corrupt
+        except Exception as e:
+            logger.error(f"Error reading trade history file '{TRADE_HISTORY_FILE}' during update: {e}", exc_info=True)
+            return # Cannot proceed if reading fails
 
         updated = False
         for trade in history:
@@ -961,6 +906,18 @@ def analyze_trade_history_and_learn():
         return None # Or return empty insights
 
     try:
+        history = []
+        if os.path.exists(TRADE_LOG_FILE):
+            with open(TRADE_LOG_FILE, 'r') as f:
+                try:
+                    history = json.load(f)
+                    if not isinstance(history, list):
+                        logger.warning(f"{TRADE_LOG_FILE} does not contain a list. Reinitializing.")
+                        history = []
+                except json.JSONDecodeError:
+                    logger.warning(f"Error decoding JSON from {TRADE_LOG_FILE}. Reinitializing.")
+                    history = []
+        
         with open(TRADE_HISTORY_FILE, 'r') as f:
             history = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError) as e:
@@ -1020,7 +977,7 @@ def analyze_trade_history_and_learn():
     return learning_insights
 
 
-async def place_order(rest_client, side, equity, entry_price, llm_analysis, sentiment_score, indicator_data):
+async def place_order(rest_client, side, equity, entry_price, llm_analysis, indicator_data):
     """Place a market order with dynamic size, stop-loss, and take-profit."""
     if not equity or not entry_price or equity <= 0 or entry_price <= 0:
         logger.error(f"Invalid equity ({equity}) or entry_price ({entry_price}) for placing order.")
@@ -1094,25 +1051,25 @@ async def place_order(rest_client, side, equity, entry_price, llm_analysis, sent
             if order_data and 'orderId' in order_data:
                 logger.info(f"Order placed successfully: ID {order_data['orderId']}, Client ID {order_id}")
                 # Save trade details with context
-                save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, "Placed", llm_analysis, sentiment_score, indicator_data)
+                save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, "Placed", llm_analysis, indicator_data)
                 return order_data['orderId']
             else:
                 logger.error(f"Order placement succeeded but no orderId in response data: {order_data}")
-                save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, "PlaceFailed_NoID", llm_analysis, sentiment_score, indicator_data)
+                save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, "PlaceFailed_NoID", llm_analysis, indicator_data)
                 return None
         else:
             error_msg = result.get('msg', 'Unknown error') if isinstance(result, dict) else str(result)
             logger.error(f"Failed to place order: {error_msg}")
-            save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, f"PlaceFailed_{error_msg[:50]}", llm_analysis, sentiment_score, indicator_data) # Save truncated error
+            save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, f"PlaceFailed_{error_msg[:50]}", llm_analysis, indicator_data) # Save truncated error
             return None
 
     except BitgetAPIException as e:
         logger.error(f"API Exception placing order: {e}")
-        save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, f"PlaceFailed_APIExc_{e.message[:50]}", llm_analysis, sentiment_score, indicator_data)
+        save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, f"PlaceFailed_APIExc_{e.message[:50]}", llm_analysis, indicator_data)
         return None
     except Exception as e:
         logger.error(f"Unexpected error placing order: {e}", exc_info=True)
-        save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, f"PlaceFailed_Exc_{str(e)[:50]}", llm_analysis, sentiment_score, indicator_data)
+        save_trade_history(order_id, side, size, entry_price, stop_loss_price, take_profit_price, f"PlaceFailed_Exc_{str(e)[:50]}", llm_analysis, indicator_data)
         return None
 
 
@@ -1123,12 +1080,7 @@ async def run_trading_cycle(rest_client):
         # 1. Fetch News
         news_items = await fetch_news()
 
-        # 1.5 Fetch Social Media Sentiment (Twitter)
-        # TODO: Make the query configurable or dynamic based on context/ticker
-        sentiment_query = f'{TARGET_INSTRUMENT.replace("SUSDT","")} OR ${TARGET_INSTRUMENT.replace("SUSDT","")} -is:retweet lang:en'
-        # Remove await as fetch_tweets_and_analyze is synchronous
-        social_sentiment_score = sentiment_analyzer.fetch_tweets_and_analyze(sentiment_query, max_results=25)
-        logger.info(f"Fetched Twitter sentiment score for '{sentiment_query}': {social_sentiment_score:.4f}")
+
 
         # 2. Get Recent Candles
         # Make a copy to avoid modification during iteration if WS updates
@@ -1149,8 +1101,12 @@ async def run_trading_cycle(rest_client):
         if not indicator_data:
             logger.warning("Proceeding without technical indicators for this cycle.")
 
-        # 4. Get LLM Analysis
-        analysis = await get_llm_analysis(news_items, current_candles[-10:], indicator_data, social_sentiment_score) # Pass sentiment score
+        # 4. Analyze Trade History for Learning Insights
+        learning_insights = analyze_trade_history_and_learn() # Assuming this function exists and returns a dict
+        logger.info(f"Learning Insights: {learning_insights}")
+
+        # 5. Get LLM Analysis
+        analysis = await get_llm_analysis(news_items, current_candles[-10:], indicator_data, learning_insights)
         if not analysis:
             logger.error("Failed to get LLM analysis.")
             return
@@ -1178,10 +1134,10 @@ async def run_trading_cycle(rest_client):
 
             if signal == "Long":
                 logger.info("Executing LONG trade based on LLM analysis.")
-                await place_order(rest_client, 'buy', current_equity, entry_price_proxy, analysis, social_sentiment_score, indicator_data)
+                await place_order(rest_client, 'buy', current_equity, entry_price_proxy, analysis, indicator_data)
             elif signal == "Short":
                 logger.info("Executing SHORT trade based on LLM analysis.")
-                await place_order(rest_client, 'sell', current_equity, entry_price_proxy, analysis, social_sentiment_score, indicator_data)
+                await place_order(rest_client, 'sell', current_equity, entry_price_proxy, analysis, indicator_data)
             elif signal == "Hold":
                 logger.info("LLM signal is HOLD. No trade executed.")
             else:
@@ -1214,9 +1170,9 @@ async def main():
     loop = asyncio.get_running_loop() # Get the main event loop
 
     try:
-        # Instantiate REST client
-        rest_client = BitgetApi(BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE, use_server_time=True)
-        logger.info("REST Client Initialized.")
+        # Instantiate REST client, explicitly providing the base_url
+        rest_client = BitgetApi(BITGET_API_KEY, BITGET_SECRET_KEY, BITGET_PASSPHRASE, use_server_time=True, base_url=c.API_URL)
+        logger.info(f"REST Client Initialized with base URL: {rest_client.BASE_URL}")
 
         # Connect WebSockets concurrently, passing the loop
         ws_client_private, ws_client_public = await asyncio.gather(
@@ -1233,12 +1189,17 @@ async def main():
             # Bot can continue, but analysis will lack live candles
 
         logger.info("Starting trading bot loop...")
+        # Modified outer loop to run only once for testing
         while True:
-            # Pass only the REST client, cycle fetches candles from global store
-            await run_trading_cycle(rest_client)
-            # Removed fixed sleep from main loop, cycle now handles dynamic wait
-            logger.info(f"Cycle finished. Waiting for 1 hour...")
-            await asyncio.sleep(3600)  # Run every hour
+            try:
+                # Pass all required clients to the trading cycle
+                await run_trading_cycle(rest_client) # Corrected function call, ws_client_private and ws_client_public are globally accessible or passed differently if needed by run_trading_cycle
+                logger.info("Main loop execution finished. Breaking loop for testing.")
+                break # Re-added for testing
+            except Exception as loop_exception:
+                 logger.error(f"Error during trading cycle execution: {loop_exception}", exc_info=True)
+                 # Optional: Add a longer sleep here if errors are frequent
+                 await asyncio.sleep(60) # e.g., wait 60 seconds after an error
 
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("Shutdown signal received...")
@@ -1260,3 +1221,142 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+# --- Placeholder for Trade Size Calculation ---
+def calculate_trade_size(equity, risk_percentage, entry_price):
+    """Placeholder function to calculate trade size."""
+    if equity is None or entry_price is None or entry_price == 0:
+        logger.warning("Cannot calculate trade size: Missing equity or entry price.")
+        return None
+    
+    risk_amount = equity * (risk_percentage / 100.0)
+    # Simple size calculation (adjust based on contract value/leverage if needed)
+    # This is a basic example and might need refinement based on instrument specifics
+    size = risk_amount / entry_price 
+    # Example: Round to 3 decimal places for BTC
+    calculated_size = round(size, 3) 
+    logger.info(f"Calculated trade size: {calculated_size} based on equity {equity}, risk {risk_percentage}%, price {entry_price}")
+    # Add minimum size check if necessary
+    if calculated_size <= 0:
+        logger.warning(f"Calculated trade size is zero or negative ({calculated_size}). Returning None.")
+        return None
+    return calculated_size
+
+# --- Core Trading Logic --- 
+async def execute_main_trading_logic(rest_client, ws_client_private, ws_client_public):
+    """Executes the main trading cycle: data fetch, analysis, decision, execution."""
+    logger.info("Starting main trading logic execution...")
+
+    # Initial Equity Fetch with Delay
+    logger.info("Allowing 2 seconds for REST client stabilization...")
+    await asyncio.sleep(2)
+    initial_equity = await get_account_equity(rest_client)
+    if initial_equity is None:
+        logger.error("Failed to get initial account equity. Cannot proceed with dynamic sizing.")
+        # Decide how to handle this - maybe return or use a default size?
+        # For now, we'll log the error and potentially skip trading this cycle
+        current_equity = None # Indicate equity is unknown
+    else:
+        current_equity = initial_equity
+        logger.info(f"Initial account equity fetched: {current_equity}")
+
+    # --- Trading Loop (Conceptual - actual loop is in main) ---
+    # This function represents one cycle within the main loop
+    try:
+        # 1. Wait for sufficient data
+        min_candles = 26 # For indicators
+        if len(candle_data_buffer) < min_candles:
+            logger.info(f"Waiting for sufficient candle data ({len(candle_data_buffer)}/{min_candles})...")
+            return # Skip this cycle if not enough data
+
+        logger.info("Sufficient candle data available. Proceeding with cycle.")
+        local_candle_data = list(candle_data_buffer) # Copy buffer for analysis
+
+        # 2. Fetch Data
+        logger.info("Fetching news data...")
+        news_items = await fetch_news()
+        # Placeholder for social sentiment - replace with actual implementation if available
+        social_sentiment_score = 0.0 
+        logger.info(f"Using placeholder social sentiment: {social_sentiment_score}")
+
+        # 3. Calculate Indicators
+        logger.info("Calculating technical indicators...")
+        indicators = calculate_indicators(local_candle_data)
+        if indicators is None:
+            logger.warning("Failed to calculate indicators. Skipping LLM analysis and trade decision.")
+            return
+
+        # 4. Get LLM Analysis
+        logger.info("Requesting LLM analysis...")
+        llm_analysis = await get_llm_analysis(news_items, local_candle_data[-10:], indicators, social_sentiment_score) # Send last 10 candles
+
+        if llm_analysis is None:
+            logger.warning("Failed to get LLM analysis. Skipping trade decision.")
+            return
+        
+        logger.info(f"LLM Analysis Received: {llm_analysis}")
+        signal = llm_analysis.get('signal')
+        confidence = llm_analysis.get('confidence')
+
+        # 5. Decision Logic & Trade Execution
+        if signal in ["Long", "Short"]:
+            logger.info(f"LLM Signal: {signal} with {confidence} confidence.")
+            
+            # Check current position (using global state updated by WS)
+            # This assumes handle_private_message updates current_positions correctly
+            current_pos_size = current_positions.get(TARGET_INSTRUMENT, 0.0)
+            logger.info(f"Current position size for {TARGET_INSTRUMENT}: {current_pos_size}")
+
+            # Basic position management: Avoid opening new trade if already in one
+            # (More sophisticated logic could handle adding to positions, etc.)
+            if (signal == "Long" and current_pos_size > 0) or \
+               (signal == "Short" and current_pos_size < 0):
+                logger.info(f"Already in a {signal.lower()} position ({current_pos_size}). Holding.")
+            elif current_equity is not None:
+                 # Get latest price for size calculation (use last close price)
+                last_close_price = float(local_candle_data[-1]['c'])
+                
+                # Calculate trade size
+                trade_size = calculate_trade_size(current_equity, RISK_PER_TRADE_PERCENT, last_close_price)
+
+                if trade_size is not None and trade_size > 0:
+                    logger.info(f"Attempting to place {signal} order for {trade_size} {TARGET_INSTRUMENT}...")
+                    # Placeholder for SL/TP - implement calculation if needed
+                    stop_loss = None 
+                    take_profit = None
+                    
+                    trade_success = await place_trade_via_rest(
+                        rest_client,
+                        TARGET_INSTRUMENT,
+                        signal,
+                        trade_size,
+                        stop_loss_price=stop_loss,
+                        take_profit_price=take_profit
+                    )
+                    
+                    if trade_success:
+                        logger.info(f"Successfully placed {signal} order.")
+                        # Optionally save trade history here or rely on WS updates
+                        # save_trade_history(...) # Consider if needed here
+                    else:
+                        logger.error(f"Failed to place {signal} order.")
+                else:
+                    logger.warning("Calculated trade size is invalid or zero. Cannot place order.")
+            else:
+                 logger.warning("Cannot calculate trade size or place order due to missing equity information.")
+
+        elif signal == "Hold":
+            logger.info("LLM Signal: Hold. No trade action taken.")
+        else:
+            logger.warning(f"Received unexpected signal from LLM: {signal}")
+
+    except Exception as e:
+        logger.error(f"Error during main trading logic execution: {e}", exc_info=True)
+
+    logger.info("Finished main trading logic execution cycle.")
+
+
+TRADE_LOG_FILE = "trade_history.json"
+
+def save_trade_history(client_order_id, side, size, entry_price, stop_loss_price, take_profit_price, status, llm_analysis=None, indicators=None):
+    """Saves trade details and context to a JSON file."""

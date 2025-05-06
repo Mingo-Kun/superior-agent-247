@@ -63,11 +63,11 @@ class SentimentAnalyzer:
         # Polarity score ranges from -1 (negative) to 1 (positive)
         return analysis.sentiment.polarity
 
-    def fetch_tweets_and_analyze(self, query, max_results=10):
-        """Fetches recent tweets based on a query and calculates the average sentiment.
+    def fetch_tweets_and_analyze(self, search_query_string, max_tweets=10):
+        """Fetches recent tweets based on a search query and calculates the average sentiment.
         Args:
-            query (str): The search query (e.g., '$BTC', 'Bitcoin price').
-            max_results (int): Maximum number of tweets to fetch (min 10, max 100 for recent search).
+            search_query_string (str): The search query string (e.g., 'Bitcoin lang:en -is:retweet').
+            max_tweets (int): Maximum number of newest tweets to fetch. Min 10, Max 100 for recent search.
         Returns:
             float: Average sentiment polarity score, or 0.0 if fetching fails or no tweets found.
         """
@@ -75,48 +75,71 @@ class SentimentAnalyzer:
             print("Twitter client not initialized. Cannot fetch tweets.")
             return 0.0
 
-        sentiments = []
+        all_sentiments = []
+        total_tweets_processed = 0
+        total_tweets_fetched = 0
+
+        print(f"\nFetching tweets with query: '{search_query_string}'")
         try:
-            # Use search_recent_tweets from v2 API
-            # Note: Requires Elevated access for v2 search endpoints usually.
-            # Standard Essential access might have limitations.
+            # Ensure max_tweets is within the API's valid range [10, 100] for search_recent_tweets
+            actual_max_results = max(10, min(max_tweets, 100))
+            
             response = self.client.search_recent_tweets(
-                query=query,
-                max_results=max(10, min(max_results, 100)), # Ensure max_results is within API limits (10-100)
-                tweet_fields=["created_at", "public_metrics"]
+                query=search_query_string,
+                max_results=actual_max_results, 
+                tweet_fields=["created_at", "public_metrics", "author_id"]
             )
 
             if response.data:
-                print(f"Fetched {len(response.data)} tweets for query: '{query}'")
+                print(f"Fetched {len(response.data)} tweets for query: '{search_query_string}'")
+                total_tweets_fetched += len(response.data)
+                processed_for_query = 0
                 for tweet in response.data:
+                    # Optional: Detailed logging for each tweet can be kept or removed based on verbosity needs
+                    # print(f"--- Tweet ID: {tweet.id} ---")
+                    # if tweet.public_metrics:
+                    #     print(f"  Likes: {tweet.public_metrics.get('like_count', 'N/A')}, Retweets: {tweet.public_metrics.get('retweet_count', 'N/A')}")
+                    # print(f"  Text: {tweet.text[:100]}...") # Print first 100 chars
+                    # print("--------------------------------------------------")
+
                     sentiment = self.get_tweet_sentiment(tweet.text)
-                    sentiments.append(sentiment)
-                    # print(f"Tweet: {tweet.text}\nSentiment: {sentiment:.2f}\n---")
+                    all_sentiments.append(sentiment)
+                    processed_for_query += 1
+                
+                if processed_for_query > 0:
+                    total_tweets_processed += processed_for_query
+                    print(f"Processed {processed_for_query} tweets for query '{search_query_string}'.")
+                else:
+                    print(f"No tweets processed for query '{search_query_string}'.")
             else:
-                print(f"No recent tweets found for query: '{query}'")
-                return 0.0
+                print(f"No recent tweets found for query: '{search_query_string}'")
 
         except tweepy.errors.TweepyException as e:
-            print(f"Error fetching tweets: {e}")
-            return 0.0
+            print(f"Error fetching tweets for query '{search_query_string}': {e}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            print(f"An unexpected error occurred while fetching for query '{search_query_string}': {e}")
+
+        if not all_sentiments:
+            print("No sentiments collected from the query.")
             return 0.0
 
-        if not sentiments:
-            return 0.0
-
-        average_sentiment = sum(sentiments) / len(sentiments)
-        print(f"Average sentiment for '{query}': {average_sentiment:.4f}")
+        average_sentiment = sum(all_sentiments) / len(all_sentiments)
+        print(f"\nOverall average sentiment from {total_tweets_processed} tweets (out of {total_tweets_fetched} fetched): {average_sentiment:.4f}")
         return average_sentiment
 
 # Example Usage (can be run standalone for testing)
 if __name__ == '__main__':
     analyzer = SentimentAnalyzer()
     if analyzer.client:
-        # Example: Analyze sentiment for Bitcoin
-        btc_query = 'Bitcoin OR $BTC -is:retweet lang:en'
-        avg_sentiment = analyzer.fetch_tweets_and_analyze(btc_query, max_results=20)
-        print(f"\nOverall average sentiment for '{btc_query}': {avg_sentiment:.4f}")
+        # Example of fetching with a general query
+        general_search_query = "Bitcoin lang:en -is:retweet"
+        # Note: max_tweets will be clamped to [10,100] by the function
+        sentiment_score = analyzer.fetch_tweets_and_analyze(search_query_string=general_search_query, max_tweets=15) 
+        print(f"\nFinal average sentiment for query '{general_search_query}': {sentiment_score:.4f}")
+
+        # Example with a different query and max_tweets
+        another_query = "Ethereum OR #ETH lang:en -is:retweet -is:reply"
+        sentiment_score_another = analyzer.fetch_tweets_and_analyze(search_query_string=another_query, max_tweets=20)
+        print(f"\nFinal average sentiment for query '{another_query}': {sentiment_score_another:.4f}")
     else:
         print("Could not run example due to missing Twitter API credentials.")

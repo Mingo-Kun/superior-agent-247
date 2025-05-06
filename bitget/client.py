@@ -8,19 +8,20 @@ logger = logging.getLogger(__name__)
 
 class Client(object):
 
-    def __init__(self, api_key, api_secret_key, passphrase, use_server_time=False, first=False):
+    def __init__(self, api_key, api_secret_key, passphrase, use_server_time=False, first=False, base_url=c.API_URL):
 
         self.API_KEY = api_key
         self.API_SECRET_KEY = api_secret_key
         self.PASSPHRASE = passphrase
         self.use_server_time = use_server_time
         self.first = first
+        self.BASE_URL = base_url # Store the base URL
 
     def _request(self, method, request_path, params, cursor=False):
         if method == c.GET:
             request_path = request_path + utils.parse_params_to_str(params)
         # url
-        url = c.API_URL + request_path
+        url = self.BASE_URL + request_path # Use the stored base URL
 
         # 获取本地时间 (Get local time)
         timestamp = utils.get_timestamp()
@@ -120,13 +121,14 @@ class Client(object):
                 if isinstance(res_json, dict):
                     data = res_json.get('data')
                     if isinstance(data, dict):
+                        if 'serverTime' in data: return data['serverTime'] # Check for 'serverTime'
                         if 'ts' in data: return data['ts']
                         if 'timestamp' in data: return data['timestamp']
                     if 'ts' in res_json: return res_json['ts']
                     if 'timestamp' in res_json: return res_json['timestamp']
 
                 # If not found in expected places, log warning and return None
-                logger.warning(f"Timestamp key not found in expected locations in server time response: {res_json}")
+                logger.warning(f"Timestamp key ('serverTime', 'ts', 'timestamp') not found in expected locations in server time response: {res_json}")
                 return None
             else:
                 logger.error(f"Failed to fetch server time, status code: {response.status_code}, response: {response.text}")

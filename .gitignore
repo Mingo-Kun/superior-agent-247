@@ -1,1 +1,5 @@
 .env
+bitget_api_test.py
+websocket_test.py
+websockets_test.py
+bot.log
