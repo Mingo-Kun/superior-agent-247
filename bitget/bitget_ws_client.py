@@ -81,7 +81,7 @@ class BitgetWsClientAsync:
         """The main loop for connecting, handling messages, and reconnecting."""
         while self.__should_reconnect:
             try:
-                async with websockets.connect(self.__url, ssl=self.ssl_context, ping_interval=10, ping_timeout=10) as ws:
+                async with websockets.connect(self.__url, ssl=self.ssl_context, ping_interval=10, ping_timeout=10, open_timeout=30) as ws:
                     self.__connection = ws
                     logger.info(f"Assigned connection object type: {type(ws)}; dir: {dir(ws)}")
                     self.__reconnect_attempts = 0

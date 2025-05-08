@@ -75,12 +75,20 @@ class Client(object):
                 res_header = response.headers
                 res_json = response.json() # Parse JSON once
 
-                # Check for API-level errors within the JSON response
-                if isinstance(res_json, dict) and res_json.get('code') != '0':
-                     # Log API error but let the calling function handle it based on context
-                     logger.warning(f"API returned error: code={res_json.get('code')}, msg={res_json.get('msg')}")
-                     # Depending on strictness, could raise exception here:
-                     # raise exceptions.BitgetAPIException(response)
+                # Check for API-level status within the JSON response
+                if isinstance(res_json, dict):
+                    api_code = res_json.get('code')
+                    api_msg = res_json.get('msg')
+                    if api_code == '00000':
+                        # This is a success code, do not log as a warning.
+                        # Optionally, could log as INFO if detailed success logging is desired:
+                        # logger.info(f"API call successful: code={api_code}, msg={api_msg}")
+                        pass
+                    else:
+                        # This is an actual error code from the API
+                        logger.warning(f"API returned error: code={api_code}, msg={api_msg}")
+                        # Depending on strictness, could raise exception here:
+                        # raise exceptions.BitgetAPIException(response)
 
                 if cursor:
                     r = dict()
