@@ -27,7 +27,7 @@ def default_error_handle(error):
     logger.error(f"Default Error Handler Received: {error}", exc_info=True)
 
 class BitgetWsClientAsync:
-    def __init__(self, url, api_key=None, api_secret_key=None, passphrase=None, listener=None, error_listener=None):
+    def __init__(self, url, api_key=None, api_secret_key=None, passphrase=None, listener=None, error_listener=None, rest_client=None):
         utils.check_none(url, "url")
         self.__url = url
         self.__api_key = api_key
@@ -47,6 +47,7 @@ class BitgetWsClientAsync:
         self.__subscribed_channels = set()
         self.__scribe_map = {} # For channel-specific listeners (optional)
         self.__allbooks_map = {} # For checksum logic
+        self.rest_client = rest_client # Store the REST client instance
 
         # Configure SSL context to disable hostname verification (use with caution)
         self.ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
