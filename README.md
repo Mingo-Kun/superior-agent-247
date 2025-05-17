@@ -5,10 +5,10 @@ Superior Agent 247 is an advanced, AI-powered trading bot designed for the Bitge
 
 ## Key Features
 - **Real-time Data Processing**: Utilizes WebSocket connections for continuous market data (candles) and private account updates (equity, positions, orders).
-- **AI-Driven Analysis**: Employs an LLM (via OpenRouter) to analyze a combination of news sentiment (from RSS feeds), technical indicators, and insights learned from past trade performance (`learning_insights`).
-- **Automated Trade Execution**: Places trades automatically on Bitget via their REST API based on the LLM's signals.
-- **Dynamic Risk Management**: Implements dynamic trade sizing based on account equity and pre-defined risk percentages. Includes stop-loss and take-profit mechanisms.
-- **Comprehensive Logging**: Maintains detailed logs for all operations, including trade history (`trade_history.json`) and general bot activity (`bot.log`).
+- **AI-Driven Analysis**: Employs an LLM (via OpenRouter) to analyze a combination of news sentiment (from RSS feeds), technical indicators, and insights learned from past trade performance (`learning_insights`). The LLM provides a trading signal (Long, Short, or Hold) and can recommend leverage, take profit, and stop loss percentages.
+- **Automated Trade Execution**: Places trades automatically on Bitget via their REST API based on the LLM's signals. Supports market orders with optional Take Profit and Stop Loss.
+- **Dynamic Risk Management**: Implements dynamic trade sizing based on account equity and pre-defined risk percentages. Includes stop-loss and take-profit mechanisms placed as position TP/SL orders after the main trade.
+- **Comprehensive Logging**: Maintains detailed logs for all operations, including trade history (`trade_history.json`), general bot activity (`bot.log`), and detailed trade events (`trade_events.log`).
 - **Asynchronous Architecture**: Built with Python's `asyncio` for efficient handling of WebSocket communications and concurrent tasks.
 - **Configurable Parameters**: Easily adjustable settings for API keys, trading instruments, candle intervals, risk parameters, and RSS feed sources via a `.env` file and script constants.
 - **Learning from Past Trades**: Analyzes `trade_history.json` to generate `learning_insights` (e.g., average PnL, win/loss rates) which are then fed back into the LLM to potentially improve future trading decisions.
@@ -113,7 +113,7 @@ The bot operates in a continuous loop, performing the following steps in each cy
         *   Places a market order via the Bitget REST API.
         *   Logs the trade attempt and details in `trade_history.json`.
     *   If the signal is 'Hold' or confidence is low, no trade is executed.
-7.  **Wait/Loop**: Waits for a configurable interval (e.g., aligned with candle duration or a fixed polling time) before starting the next cycle. The main loop in the current version is set to break after one full cycle for testing purposes (`MAIN_LOOP_TEST_MODE = True`). Set to `False` for continuous operation.
+7.  **Wait/Loop**: Waits for a configurable interval (e.g., aligned with candle duration or a fixed polling time) before starting the next cycle. The main loop can be configured to run for a single cycle for testing or continuously.
 
 ### WebSocket Data Handling
 -   **Public WebSocket (`handle_public_message`)**: Receives and stores candle data for `TARGET_INSTRUMENT` in `candle_data_store`.
@@ -146,6 +146,7 @@ To adapt or enhance the trading strategy:
 
 -   **Trade History**: `trade_history.json` - A JSON file logging details of each trade attempted or executed, including entry/exit prices, status, PnL, and the LLM analysis at the time of the trade.
 -   **System Logs**: `bot.log` - Contains detailed operational logs, including WebSocket messages, API calls, errors, and informational messages about the bot's status.
+-   **Trade Event Logs**: `trade_events.log` - A detailed log file specifically for trade-related events, including order placement attempts, successes, failures, and exceptions.
 
 ## Troubleshooting
 
