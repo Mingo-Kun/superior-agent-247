@@ -15,19 +15,42 @@ Superior Agent 247 is an advanced, AI-powered trading bot designed for the Bitge
 
 ## Architecture
 
+The architecture of Superior Agent 247 is designed for efficient, real-time trading automation with a strong feedback loop for learning and improvement. Core components include:
+
+- **WebSocket Clients**: For real-time market data and private account updates.
+- **Data Aggregator & Technical Analysis (TA)**: Aggregates price candles and computes technical indicators.
+- **News Sentiment Fetcher**: Pulls and parses news headlines from RSS feeds.
+- **LLM Analysis Engine**: Uses a large language model (LLM) to synthesize market data, technicals, news sentiment, and learning insights to generate trade signals.
+- **Trade Execution Logic**: Handles risk-managed order sizing, order placement, and position management using the Bitget REST API.
+- **Logging & Learning**: All actions are logged to files, and trade history is analyzed to improve future decisions.
+
 ```mermaid
 graph TD
-    A[WebSocket Public Bitget] -->|Candle Data (e.g., 1H SBTCSUSDT)| B[Data Aggregation & TA Calculation]
-    A2[WebSocket Private Bitget] -->|Account Updates, Position Info, Order Status| B
-    C[RSS News Feeds] -->|News Headlines & Content| D[LLM Analysis Engine]
-    B -->|Processed Market Data & Indicators| D
-    D -->|Trade Signal (Long/Short/Hold) & Reasoning| E[Trade Execution Logic]
-    E -->|Place/Manage Order| F[Bitget REST API]
-    F -->|Order Confirmation/Error| E
-    E -->|Log Trade Details| G[Trade History (trade_history.json)]
-    B -->|Log System Events| H[System Log (bot.log)]
-    D -->|Log LLM Interaction| H
+    subgraph Data Sources
+        A[Bitget WebSocket (Market Data)] --> B[Aggregator & TA]
+        A2[Bitget WebSocket (Private Account)] --> B
+        C[RSS News Feeds] --> D[LLM Analysis Engine]
+    end
+    B -->|Processed Data & Indicators| D
+    D -->|Trade Signal & Reasoning| E[Trade Execution]
+    E -->|Orders| F[Bitget REST API]
+    F -->|Order Updates| E
+    E -->|Log Trades| G[Trade History]
+    E -->|Log Events| H[System Log]
+    D -->|Log LLM Output| H
+    G -->|Feedback: Learning Insights| D
 ```
+
+**Flow Summary:**
+
+1. **Market Data & Account Events:** Market candles and account states are streamed via Bitget WebSockets (public & private).
+2. **Data Aggregation & TA:** Raw data is aggregated, and technical indicators are calculated.
+3. **News Sentiment:** Latest headlines are fetched from configured RSS feeds.
+4. **LLM Analysis:** The LLM combines technicals, news, and learning insights to issue a trade signal (Long/Short/Hold) and rationale.
+5. **Trade Execution:** If conditions are met, trades are placed via Bitget REST API with dynamic risk management.
+6. **Logging & Learning:** Every action (signal, order, result) is logged. Trade history is analyzed to produce learning insights, which feed back into the LLM for improved future decisions.
+
+This modular, asynchronous architecture enables real-time, adaptive trading with transparency and continual self-improvement.
 
 ## Installation
 
