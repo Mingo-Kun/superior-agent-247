@@ -98,7 +98,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY","")
 BITGET_API_KEY = os.getenv("BITGET_API_KEY","")
 BITGET_SECRET_KEY = os.getenv("BITGET_SECRET_KEY","")
 BITGET_PASSPHRASE = os.getenv("BITGET_PASSPHRASE","")
-LLM_MODEL = os.getenv("LLM_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1:free")
+LLM_MODEL = os.getenv("LLM_MODEL", "deepseek/deepseek-chat-v3-0324:free")
 
 # Global flag to signal trading cycle restart
 RESTART_TRADING_CYCLE_FLAG = asyncio.Event()
@@ -1960,55 +1960,24 @@ async def place_order(rest_client, side, equity, entry_price, llm_analysis, indi
 
     # current_tp_percent and current_sl_percent are already initialized at the beginning of the function.
 
-    if recommended_margin_usdt is not None and isinstance(recommended_margin_usdt, (float, int)) and recommended_margin_usdt > 0 and size > 0:
-        logger.info(f"Calculating TP/SL based on recommended_margin_usdt: {recommended_margin_usdt} and size: {size}")
-        # Calculate TP/SL amounts based on the margin used for this specific trade
-        tp_amount_usdt = recommended_margin_usdt * current_tp_percent
-        sl_amount_usdt = recommended_margin_usdt * current_sl_percent
+    # Always calculate TP/SL based on entry price
+    logger.info(f"Calculating TP/SL based on entry_price: {entry_price} and size: {size}")
+    if current_tp_percent <= total_fee_consideration_rate:
+        logger.warning(f"TAKE_PROFIT_PERCENT ({current_tp_percent*100}%) is less than or equal to total fee consideration ({total_fee_consideration_rate*100}%). Profit target may not cover fees.")
 
-        # Calculate fee amount based on the position value for TP adjustment
-        # Using size * entry_price for a more accurate position value for fee calculation
-        approx_position_value_for_fees = size * entry_price 
-        fee_per_leg_usdt = approx_position_value_for_fees * TRADING_FEE_RATE
-        total_fees_for_tp_usdt = 2 * fee_per_leg_usdt # Entry and Exit fees
-
-        if side == 'buy': # Long position
-            # SL: Margin loss amount / size = price drop per unit
-            stop_loss_price = entry_price - (sl_amount_usdt / size)
-            # TP: Margin gain amount / size = price increase per unit. Add fees to target gain.
-            take_profit_price = entry_price + ((tp_amount_usdt + total_fees_for_tp_usdt) / size)
-            if take_profit_price <= entry_price + (total_fees_for_tp_usdt / size):
-                 logger.warning(f"Adjusted take profit price ({take_profit_price}) for long (margin-based) is too close to or below entry + fees. Original TP target amount: {tp_amount_usdt}, Total fees for TP: {total_fees_for_tp_usdt}")
-        elif side == 'sell': # Short position
-            # SL: Margin loss amount / size = price increase per unit
-            stop_loss_price = entry_price + (sl_amount_usdt / size)
-            # TP: Margin gain amount / size = price drop per unit. Subtract fees from target gain (as price moves down).
-            take_profit_price = entry_price - ((tp_amount_usdt + total_fees_for_tp_usdt) / size)
-            if take_profit_price >= entry_price - (total_fees_for_tp_usdt / size):
-                logger.warning(f"Adjusted take profit price ({take_profit_price}) for short (margin-based) is too close to or above entry - fees. Original TP target amount: {tp_amount_usdt}, Total fees for TP: {total_fees_for_tp_usdt}")
-        else:
-            logger.error(f"Invalid side '{side}' for margin-based SL/TP calculation.")
-            return None
-        logger.info(f"Margin-based SL/TP: SL Amount: {sl_amount_usdt}, TP Amount (pre-fee): {tp_amount_usdt}, Total Fees for TP: {total_fees_for_tp_usdt}")
-
+    if side == 'buy': # Long position
+        stop_loss_price = entry_price * (1 - current_sl_percent)
+        take_profit_price = entry_price * (1 + current_tp_percent + total_fee_consideration_rate)
+        if take_profit_price <= entry_price * (1 + total_fee_consideration_rate):
+            logger.warning(f"Adjusted take profit price ({take_profit_price}) for long (entry-price based) is too close to or below entry price + fees. Original TP: {entry_price * (1 + current_tp_percent)}")
+    elif side == 'sell': # Short position
+        stop_loss_price = entry_price * (1 + current_sl_percent)
+        take_profit_price = entry_price * (1 - current_tp_percent - total_fee_consideration_rate)
+        if take_profit_price >= entry_price * (1 - total_fee_consideration_rate):
+            logger.warning(f"Adjusted take profit price ({take_profit_price}) for short (entry-price based) is too close to or above entry price - fees. Original TP: {entry_price * (1 - current_tp_percent)}")
     else:
-        logger.info(f"Falling back to entry price based TP/SL calculation (recommended_margin_usdt not available or size is zero).")
-        if current_tp_percent <= total_fee_consideration_rate:
-            logger.warning(f"TAKE_PROFIT_PERCENT ({current_tp_percent*100}%) is less than or equal to total fee consideration ({total_fee_consideration_rate*100}%). Profit target may not cover fees.")
-
-        if side == 'buy': # Long position
-            stop_loss_price = entry_price * (1 - current_sl_percent)
-            take_profit_price = entry_price * (1 + current_tp_percent + total_fee_consideration_rate)
-            if take_profit_price <= entry_price * (1 + total_fee_consideration_rate):
-                logger.warning(f"Adjusted take profit price ({take_profit_price}) for long (entry-price based) is too close to or below entry price + fees. Original TP: {entry_price * (1 + current_tp_percent)}")
-        elif side == 'sell': # Short position
-            stop_loss_price = entry_price * (1 + current_sl_percent)
-            take_profit_price = entry_price * (1 - current_tp_percent - total_fee_consideration_rate)
-            if take_profit_price >= entry_price * (1 - total_fee_consideration_rate):
-                logger.warning(f"Adjusted take profit price ({take_profit_price}) for short (entry-price based) is too close to or above entry price - fees. Original TP: {entry_price * (1 - current_tp_percent)}")
-        else:
-            logger.error(f"Invalid side '{side}' for entry-price based SL/TP calculation.")
-            return None
+        logger.error(f"Invalid side '{side}' for entry-price based SL/TP calculation.")
+        return None
 
     # Round prices using the new round_price function
     # Ensure precisions are loaded for TARGET_INSTRUMENT before calling place_order or early in main_trading_loop
